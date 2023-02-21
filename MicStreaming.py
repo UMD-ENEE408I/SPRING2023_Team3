@@ -11,7 +11,7 @@ filename = "output.wav"
 audio = pyaudio.PyAudio()
 # Test
 stream = audio.open(format=FORMAT, channels=CHANNELS, rate=sampleRate, input=True, frames_per_buffer=chunk)
-
+# Test Git
 frames = [] # stores recorded data
 # Store data in chunks for 3 seconds
 for i in range(0, int(sampleRate/ chunk * 10)):
