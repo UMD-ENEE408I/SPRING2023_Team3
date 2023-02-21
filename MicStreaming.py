@@ -9,7 +9,7 @@ chunk = 1024 # record in chunks of 1024 samples
 filename = "output.wav"
 
 audio = pyaudio.PyAudio()
-
+# Test
 stream = audio.open(format=FORMAT, channels=CHANNELS, rate=sampleRate, input=True, frames_per_buffer=chunk)
 
 frames = [] # stores recorded data
