@@ -1,47 +1,65 @@
 import pyaudio
-import sys
+import threading
 import time
-import wave
 import matplotlib.pyplot as plt
 import numpy as np
+import sounddevice as sd
 
-fs = 44100  # samples per second
-FORMAT = pyaudio.paInt16  # 16 bits per sample
-CHANNELS = 1  # Audio Channels
-chunk = 1024  # record in chunks of 1024 samples
-frames = []  # stores recorded data
-save_length = 7.5  # Length of audio data saved from end
-start_time = time.time()
-filename = "output.wav"
+class Streaming(object):
+    def __init__(self):
+        print("Initializing Microphone...")
+        self.fs = 44100  # samples per second
+        self.FORMAT = pyaudio.paInt16  # 16 bits per sample
+        self.CHANNELS = 1  # Audio Channels
+        self.chunk = 1024  # record in chunks of 1024 samples
+        self.save_length = 5  # Length of audio data saved from end (s)
+        self.t = []  # stores time corresponding to each sample
+        self.frames = []  # stores recorded data
+        self.start_time = time.time()
+        self.audio = pyaudio.PyAudio()
 
-audio = pyaudio.PyAudio()
-stream = audio.open(format=FORMAT,
-                    channels=CHANNELS,
-                    rate=fs,
-                    input=True,
-                    frames_per_buffer=chunk)
+    def start_recording(self):
+        self.stream = self.audio.open(format=self.FORMAT,
+                            channels=self.CHANNELS,
+                            rate=self.fs,
+                            input=True,
+                            frames_per_buffer=self.chunk,
+                            input_device_index=1)
+        print("Started Audio Stream")
+
+    # Need to add methods to get the time and data vector of the recording
+    def stream_read(self):
+        try:
+            while True:
+                data = np.frombuffer(self.stream.read(self.chunk), dtype=np.int16)
+                t = self.stream.get_time()
+                self.frames.append(data)
+                # Only keep the last 300 chunks (5 seconds)
+                self.frames = self.frames[-int(((self.fs / self.chunk) * self.save_length)):]
+                self.t = self.t[-len(self.frames):]
+        except:
+            print("Exception")
+            return
+
+    def plot_data(self):
+        amplitude = np.hstack(self.frames)
+        x = np.linspace(0, len(amplitude) / self.fs, num=len(amplitude))
+        plt.plot(x, amplitude)
+        plt.show()
 
 
-while time.time() - start_time < 10:
-    # Get Audio Data into frame. runs for time interval
-    data = np.frombuffer(stream.read(chunk), dtype=np.int16)
-    frames.append(data)
-    # Only keep the last 300 chunks (7.5 seconds)
-    frames = frames[-int(((fs / chunk) * save_length)):]
-    # plot frames
+    def stop_recording(self):
+        if 'stream' in locals():
+            self.stream.stop_stream()
+            self.stream.close()
+        print("Recording Stopped")
 
-amplitude = np.hstack(frames)
-Time = np.linspace(0, len(amplitude) / fs, num=len(amplitude))
-plt.plot(Time, amplitude)
-plt.show()
+    def close(self):
+        self.stream_stop()
+        self.audio.terminate()
 
-stream.stop_stream()
-stream.close()
-audio.terminate()
-
-wf = wave.open(filename, 'wb')
-wf.setnchannels(CHANNELS)
-wf.setsampwidth(audio.get_sample_size(FORMAT))
-wf.setframerate(fs)
-wf.writeframes(b''.join(frames))
-wf.close()
+if __name__=="__main__":
+    mic1 = Streaming()
+    mic1.start_recording()
+    mic1.stream_read()
+    mic1.plot_data()
