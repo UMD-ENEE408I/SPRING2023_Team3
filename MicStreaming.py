@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+import filter
+import sounddevice as sd
+from scipy.fft import fft, ifft, fftfreq
+from scipy import signal
+
+
 class Streaming(object):
     def __init__(self):
         print("Initializing Microphone...")
@@ -12,6 +18,7 @@ class Streaming(object):
         self.FORMAT = pyaudio.paInt16  # 16 bits per sample
         self.CHANNELS = 1  # Audio Channels
         self.chunk = 1024  # record in chunks of 1024 samples
+        self.device_index = None # Specify input device
         self.save_length = .15  # Length of audio data saved from end (s)
         self.t = []  # stores time corresponding to each sample
         self.frames = []  # stores recorded data
@@ -30,7 +37,7 @@ class Streaming(object):
                                       rate=self.fs,
                                       input=True,
                                       frames_per_buffer=self.chunk,
-                                      input_device_index=1)
+                                      input_device_index=self.device_index)
         print("Started Audio Stream")
 
     # Need to add methods to get the time and data vector of the recording
@@ -44,6 +51,7 @@ class Streaming(object):
                 # Only keep the last 300 chunks (5 seconds)
                 self.frames = self.frames[-int(((self.fs / self.chunk) * self.save_length)):]
                 self.t = self.t[-len(self.frames):]
+
                 self.stream_open = True
         except:
             print("Stream Stopped: Exception")
@@ -77,69 +85,131 @@ class Streaming(object):
         self.audio.terminate()
 
     def create_space(self):
-        t_data = self.t
-        raw_data = self.frames
-        # Create a linspace of the data with time values for each sample
-        first = t_data[0]
-        last = t_data[-1]
-        self.audio_data = np.hstack(raw_data)
-        self.tv = np.linspace(first, last, num=len(self.audio_data))
+        if(time.time() - self.start_time > .5):
+            t_data = self.t
+            raw_data = self.frames
+            # Create a linspace of the data with time values for each sample
+            first = t_data[0]
+            last = t_data[-1]
+            self.audio_data = np.hstack(raw_data)
+            self.tv = np.linspace(first, last, num=len(self.audio_data))
 
 
-    def sync_time(self, mic2):
+    def filter(self, filter_freq):
         if (time.time() - self.start_time) > 1:
-            time_diff = mic2.tv[0] - self.tv[0]
-            if(np.abs(time_diff) > 1/self.fs):
-                # Samples every 2.2498e-5
-                # Shift array to match
-                shift = round(time_diff / (1/self.fs))
-                if time_diff < 0: # Mic1 starts after mic2
-                    mic2.tv = mic2.tv[shift:]
-                    self.tv = self.tv[:-shift]
-                    mic2.audio_data = mic2.audio_data[shift:]
-                    self.audio_data = self.audio_data[:-shift]
-                if time_diff > 0: # Mic2 starts after Mic1
-                    mic2.tv = mic2.tv[:-shift]
-                    self.tv = self.tv[shift:]
-                    mic2.audio_data = mic2.audio_data[:-shift]
-                    self.audio_data = self.audio_data[shift:]
-
-
-    def cross_correlation(self, mic2):
-        if (time.time() - self.start_time) > 2:
             self.create_space()
-            mic2.create_space()
-            td = self.tv[0] - mic2.tv[0]
-            #self.sync_time(mic2)
-            corr = np.correlate(self.audio_data, mic2.audio_data, mode='full')
-            delay = np.argmax(corr)
-            t_delay = delay * (1 / self.fs) + td
-            return t_delay
-        # Need to make arrays much smaller. Takes forever to compute the cross correlation.
+            lowBound = (filter_freq - 25)
+            highBound = (filter_freq + 25)
+
+            self.audio_data = filter.normalize(self.audio_data)
+            transform = fft(self.audio_data)
+            # sos = signal.butter(4, [lowBound, highBound], btype='bandpass')
+            N = len(transform)
+            xf = fftfreq(transform.size, 1 / self.fs)
+            fTransform = np.copy(transform)
+            fTransform[np.abs(xf) <= lowBound] = 0
+            fTransform[np.abs(xf) >= highBound] = 0
+
+            filteredAmplitude = ifft(fTransform)
+            filteredAmplitude = filter.normalize(filteredAmplitude)
+            fn = len(filteredAmplitude)
+            amplitude = np.hstack(self.frames)
+            # Plot Raw audio and FFT of both filtered and unfiltered amplitude
+            xt = np.linspace(0, len(amplitude) / self.fs, num=len(amplitude))
+            fig, ax = plt.subplots(1, 4)
+            ax[0].plot(xf[:(N - 1)], transform[:(N - 1)], 'r')
+            ax[1].plot(xt, amplitude,  'b')
+            ax[2].plot(xf[:(N - 1)], fTransform[:(N - 1)], 'r')
+            ax[3].plot(xt, filteredAmplitude, 'g')
+            plt.show()
+
+            return filteredAmplitude
+
+
+
+    def cross_correlation(self, mic2, freq):
+        if (time.time() - self.start_time) > 1:
+            fa1 = mic1.filter(freq)
+            fa2 = mic2.filter(freq)
+            corr = signal.correlate(fa1, fa2, mode='full')
+            C_norm1 = np.zeros(corr.shape[0])
+            C_norm2 = np.zeros(corr.shape[0])
+            N = len(fa1)
+            step = 1 / mic1.fs
+            t_shift_C = np.arange((- (N * step)) + step, N * step, step)
+            center_index = int((corr.shape[0] + 1) / 2) - 1  # Index corresponding to zero shift
+            low_shift_index = -int((corr.shape[0] + 1) / 2) + 1
+            high_shift_index = int((corr.shape[0] + 1) / 2) - 1
+
+            for i in range(low_shift_index, high_shift_index + 1):
+                low_norm_index = max(0, i)
+                high_norm_index = min(fa1.shape[0], i + fa1.shape[0])
+                C_norm1[i + center_index] = np.linalg.norm(fa1[low_norm_index:high_norm_index])
+
+                low_norm_index = max(0, -i)
+                high_norm_index = min(fa2.shape[0], -i + fa2.shape[0])
+                C_norm2[i + center_index] = np.linalg.norm(fa2[low_norm_index:high_norm_index])
+
+            corr_normalized = corr / (C_norm1 * C_norm2)
+            max_indices_back = -int(((1 / freq) / 2) / (1 / mic1.fs)) + center_index
+            max_indices_forward = int(((1 / freq) / 2) / (1 / mic1.fs)) + center_index
+            i_max_C_normalized = np.argmax(corr_normalized)
+            # i_max_C_normalized = np.argmax(corr_normalized[max_indices_back:max_indices_forward + 1]) + max_indices_back
+            t_shift_hat_normalized = t_shift_C[i_max_C_normalized]
+
+            return t_shift_hat_normalized
 
 
     def time_delay(self, mic2):
-        while mic1.stream_open and mic2.stream_open:
+        while self.stream_open and mic2.stream_open:
             tdoa = mic1.cross_correlation(mic2)
             print(tdoa)
 
+
 if __name__ == "__main__":
     mic1 = Streaming()
+    mic1.device_index = 1
     mic1.start_recording()
     mic2 = Streaming()
+    mic2.device_index = 2
     mic2.start_recording()
     thread1 = threading.Thread(target=mic1.stream_read)
     thread2 = threading.Thread(target=mic2.stream_read)
     thread1.start()
     thread2.start()
-    #mic1.time_delay(mic2)
-    time.sleep(5)
-    mic1.plot_two(mic2)
+    time.sleep(2)
+    # mic1.time_delay(mic2)
 
+    fa1 = mic1.filter(10)
+    fa2 = mic2.filter(10)
+    corr = signal.correlate(fa1, fa2, mode='full')
+    C_norm1 = np.zeros(corr.shape[0])
+    C_norm2 = np.zeros(corr.shape[0])
+    N = len(fa1)
+    step = 1/mic1.fs
+    t_shift_C = np.arange((- (N*step)) + step, N*step, step)
+    center_index = int((corr.shape[0] + 1) / 2) - 1  # Index corresponding to zero shift
+    low_shift_index = -int((corr.shape[0] + 1) / 2) + 1
+    high_shift_index = int((corr.shape[0] + 1) / 2) - 1
 
+    for i in range(low_shift_index, high_shift_index + 1):
+        low_norm_index = max(0, i)
+        high_norm_index = min(fa1.shape[0], i + fa1.shape[0])
+        C_norm1[i + center_index] = np.linalg.norm(fa1[low_norm_index:high_norm_index])
 
+        low_norm_index = max(0, -i)
+        high_norm_index = min(fa2.shape[0], -i + fa2.shape[0])
+        C_norm2[i + center_index] = np.linalg.norm(fa2[low_norm_index:high_norm_index])
 
+    corr_normalized = corr / (C_norm1 * C_norm2)
+    max_indices_back = -int(((1 / 10) / 2) / (1/mic1.fs)) + center_index
+    max_indices_forward = int(((1 / 10) / 2) / (1/mic1.fs)) + center_index
+    i_max_C_normalized = np.argmax(corr_normalized)
+    # i_max_C_normalized = np.argmax(corr_normalized[max_indices_back:max_indices_forward + 1]) + max_indices_back
+    t_shift_hat_normalized = t_shift_C[i_max_C_normalized]
 
+    print(t_shift_hat_normalized)
+    print(i_max_C_normalized)
+    plt.plot(t_shift_C, corr_normalized)
+    plt.show()
 
-
-    
