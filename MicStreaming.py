@@ -19,7 +19,7 @@ class Streaming(object):
         self.CHANNELS = 1  # Audio Channels
         self.chunk = 1024  # record in chunks of 1024 samples
         self.device_index = None # Specify input device
-        self.save_length = .15  # Length of audio data saved from end (s)
+        self.save_length = .5  # Length of audio data saved from end (s)
         self.t = []  # stores time corresponding to each sample
         self.frames = []  # stores recorded data
         self.start_time = time.time()
@@ -95,14 +95,15 @@ class Streaming(object):
             self.tv = np.linspace(first, last, num=len(self.audio_data))
 
 
-    def filter(self, filter_freq):
+    def filter(self, filter_freq, plot=False):
         if (time.time() - self.start_time) > 1:
             self.create_space()
-            lowBound = (filter_freq - 25)
-            highBound = (filter_freq + 25)
+            lowBound = (filter_freq - 100)
+            highBound = (filter_freq + 100)
 
             self.audio_data = filter.normalize(self.audio_data)
             transform = fft(self.audio_data)
+
             # sos = signal.butter(4, [lowBound, highBound], btype='bandpass')
             N = len(transform)
             xf = fftfreq(transform.size, 1 / self.fs)
@@ -114,15 +115,20 @@ class Streaming(object):
             filteredAmplitude = filter.normalize(filteredAmplitude)
             fn = len(filteredAmplitude)
             amplitude = np.hstack(self.frames)
-            # Plot Raw audio and FFT of both filtered and unfiltered amplitude
-            xt = np.linspace(0, len(amplitude) / self.fs, num=len(amplitude))
-            fig, ax = plt.subplots(1, 4)
-            ax[0].plot(xf[:(N - 1)], transform[:(N - 1)], 'r')
-            ax[1].plot(xt, amplitude,  'b')
-            ax[2].plot(xf[:(N - 1)], fTransform[:(N - 1)], 'r')
-            ax[3].plot(xt, filteredAmplitude, 'g')
-            plt.show()
 
+            # Plot Raw audio and FFT of both filtered and unfiltered amplitude
+            if plot:
+                xt = np.linspace(0, len(amplitude) / self.fs, num=len(amplitude))
+                fig, ax = plt.subplots(1, 4)
+                ax[0].plot(xf[:(N - 1)], transform[:(N - 1)], 'r')
+                ax[1].plot(xt, amplitude,  'b')
+                ax[2].plot(xf[:(N - 1)], fTransform[:(N - 1)], 'r')
+                ax[3].plot(xt, filteredAmplitude, 'g')
+                plt.show()
+
+            print('Unfiltered Max Frequency:', xf[np.argmax(transform)])
+            print('Filtered Max Frequency:', xf[np.argmax(fTransform)])
+            print(len(xf))
             return filteredAmplitude
 
 
@@ -154,7 +160,7 @@ class Streaming(object):
             max_indices_back = -int(((1 / freq) / 2) / (1 / mic1.fs)) + center_index
             max_indices_forward = int(((1 / freq) / 2) / (1 / mic1.fs)) + center_index
             i_max_C_normalized = np.argmax(corr_normalized)
-            # i_max_C_normalized = np.argmax(corr_normalized[max_indices_back:max_indices_forward + 1]) + max_indices_back
+            i_max_C_normalized = np.argmax(corr_normalized[max_indices_back:max_indices_forward + 1]) + max_indices_back
             t_shift_hat_normalized = t_shift_C[i_max_C_normalized]
 
             return t_shift_hat_normalized
@@ -162,8 +168,11 @@ class Streaming(object):
 
     def time_delay(self, mic2):
         while self.stream_open and mic2.stream_open:
-            tdoa = mic1.cross_correlation(mic2)
-            print(tdoa)
+            delay = mic1.cross_correlation(mic2, 4000)
+            tdoa = abs(delay)
+            print('Time Delay: ', tdoa)
+            print('Distance (m):', tdoa * 343)
+            return tdoa
 
 
 if __name__ == "__main__":
@@ -178,10 +187,10 @@ if __name__ == "__main__":
     thread1.start()
     thread2.start()
     time.sleep(2)
-    # mic1.time_delay(mic2)
+    # D = mic1.time_delay(mic2)
 
-    fa1 = mic1.filter(10)
-    fa2 = mic2.filter(10)
+    fa1 = mic1.filter(4000, plot=True)
+    fa2 = mic2.filter(4000, plot=True)
     corr = signal.correlate(fa1, fa2, mode='full')
     C_norm1 = np.zeros(corr.shape[0])
     C_norm2 = np.zeros(corr.shape[0])
@@ -202,10 +211,10 @@ if __name__ == "__main__":
         C_norm2[i + center_index] = np.linalg.norm(fa2[low_norm_index:high_norm_index])
 
     corr_normalized = corr / (C_norm1 * C_norm2)
-    max_indices_back = -int(((1 / 10) / 2) / (1/mic1.fs)) + center_index
-    max_indices_forward = int(((1 / 10) / 2) / (1/mic1.fs)) + center_index
+    max_indices_back = -int(((1 / 100) / 2) / (1/mic1.fs)) + center_index
+    max_indices_forward = int(((1 / 100) / 2) / (1/mic1.fs)) + center_index
     i_max_C_normalized = np.argmax(corr_normalized)
-    # i_max_C_normalized = np.argmax(corr_normalized[max_indices_back:max_indices_forward + 1]) + max_indices_back
+    i_max_C_normalized = np.argmax(corr_normalized[max_indices_back:max_indices_forward + 1]) + max_indices_back
     t_shift_hat_normalized = t_shift_C[i_max_C_normalized]
 
     print(t_shift_hat_normalized)
