@@ -40,7 +40,6 @@ class Streaming(object):
                                       input_device_index=self.device_index)
         print("Started Audio Stream")
 
-    # Need to add methods to get the time and data vector of the recording
     def stream_read(self):
         print("Recording...")
         try:
@@ -113,7 +112,7 @@ class Streaming(object):
             self.audio_data = self.audio_data[:-index_shift]
             mic2.tv = mic2.tv[index_shift:]
             mic2.audio_data = mic2.audio_data[index_shift:]
-        return
+
 
 
     def filter(self, filter_freq, plot=False):
@@ -146,9 +145,6 @@ class Streaming(object):
             plt.show()
 
         return filteredAmplitude
-
-
-
 
 
     def cross_correlation(self, mic2, freq):
@@ -198,8 +194,6 @@ class Streaming(object):
             time.sleep(.25)
 
 
-
-
 if __name__ == "__main__":
     mic1 = Streaming()
     mic1.device_index = 1
@@ -213,12 +207,3 @@ if __name__ == "__main__":
     thread2.start()
     time.sleep(2)
     D = mic1.time_delay(mic2, 4000)
-
-
-
-
-
-
-
-    # Check create_space function to see time difference between the two microphones
-    # only cross correlate the last half of the saved
