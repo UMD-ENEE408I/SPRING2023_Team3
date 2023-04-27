@@ -20,9 +20,9 @@ const int udpPort = 3333;
 boolean connected = false;
 
 
-float x_array[1] = {0.00}; 
-float y_array[1] = {0.00};
-float theta_array[1] = {0.00}; 
+float x = 0.00;
+float y = 0.00;
+float theta = 0.00; 
 
 //The udp library class
 WiFiUDP udp;
@@ -254,49 +254,13 @@ void setup() {
 
 void loop() {
 
-  // every time through this loop, we just want to start the main loop only if we have read in a valid x,y,theta
-  // startLoop is true if this is the case, otherwise we keep it false
-
   // Create the encoder objects after the motor has
   // stopped, else some sort exception is triggered
   Encoder enc1(M1_ENC_A, M1_ENC_B);
   Encoder enc2(M2_ENC_A, M2_ENC_B);
   
-  Serial.println(micros());
   // read in information from jetson
-  if(connected){
-    //Send a packet
-    udp.beginPacket(udpAddress,udpPort);
-    udp.printf("Seconds since boot: %lu", millis()/1000);
-    udp.endPacket();
-
-    int packetSize = udp.parsePacket();
-    if(packetSize >= 3*sizeof(float))
-    {
-      // Serial.printf("packet size is %d\n", packetSize);
-      Serial.println("hellp");
-      udp.read((char*)x_array, sizeof(x_array)); 
-      udp.read((char*)y_array, sizeof(y_array));
-      udp.read((char*)theta_array, sizeof(theta_array));
-      udp.flush();
-      Serial.printf("x: %f\n", x_array[0]);
-      Serial.printf("y: %f\n", y_array[0]);
-      Serial.printf("theta: %f\n", theta_array[0]);
-    }
-    else{
-      Serial.printf("Nothing to print");
-    }
-  }
-  //delay(100);
-
-  Serial.println(x_array[0]);
-  Serial.println(y_array[0]);
-  Serial.println(theta_array[0]);
-
-  // can start the movement loop once we have valid coordinates 
-  if((x_array[0] != 0.00) && (y_array[0] != 0.00) && (theta_array[0] != 0.00)) {
-    startLoop = true;
-  } 
+  
   // Loop period
   int target_period_ms = 2; // Loop takes about 3 ms so a delay of 2 gives 200 Hz or 5ms
 
@@ -347,10 +311,45 @@ void loop() {
   // time starts from 0
   float start_t = (float)micros() / 1000000.0;
   float last_t = -target_period_ms / 1000.0; // Offset by expected looptime to avoid divide by zero
-  float t = ((float)micros()) / 1000000.0 - start_t;
-  Serial.println(t);
-  
-  while (startLoop == true) {
+
+  while (true) {
+    while(startLoop == false) {
+      Serial.println("in wifi loop");
+      if(connected) {
+        //Send a packet
+        udp.beginPacket(udpAddress,udpPort);
+        udp.printf("Seconds since boot: %lu", millis()/1000);
+        udp.endPacket();
+
+        int packetSize = udp.parsePacket();
+
+        if(packetSize >= 3*sizeof(float)) {
+          // Serial.printf("packet size is %d\n", packetSize);
+          Serial.println("hellp");
+          udp.read((char*)&x, sizeof(x)); 
+          udp.read((char*)&y, sizeof(y));
+          udp.read((char*)&theta, sizeof(theta));
+          udp.flush();
+          Serial.printf("x: %f\n", x);
+          Serial.printf("y: %f\n", y);
+          Serial.printf("theta: %f\n", theta);
+        } else {
+          Serial.printf("Nothing to print");
+        }
+      }
+      delay(100);
+
+      Serial.println(x);
+      Serial.println(y);
+      Serial.println(theta);
+
+      // can start the movement loop once we have valid coordinates 
+      if((x != 0.00) && (y != 0.00) && (theta != 0.00)) {
+        startLoop = true;
+      }
+    }
+     
+
     Serial.println("We are in Movement Loop");
     // Get the time elapsed
     float t = ((float)micros()) / 1000000.0 - start_t;
@@ -360,9 +359,9 @@ void loop() {
     last_t = t;
 
     // Robot Coordinates
-    float robot_x = x_array[0];
-    float robot_y = y_array[0];
-    float robot_theta = theta_array[0];
+    float robot_x = x;
+    float robot_y = y;
+    float robot_theta = theta;
 
     
     // Get the distances the wheels have traveled in meters
