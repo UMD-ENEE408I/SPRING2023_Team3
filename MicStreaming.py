@@ -3,7 +3,6 @@ import threading
 import time
 import matplotlib.pyplot as plt
 import numpy as np
-
 import filter
 import sounddevice as sd
 from scipy.fft import fft, ifft, fftfreq
