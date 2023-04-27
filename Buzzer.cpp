@@ -21,7 +21,7 @@ void loop() {
   // ledcWriteNote(BUZZ_CHANNEL, NOTE_C, octave);
   delay(50);
   ledcWriteNote(BUZZ_CHANNEL, NOTE_A, octave);
-  delay();
+  delay(50);
 
 
 }
