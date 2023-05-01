@@ -2,13 +2,18 @@ from pupil_apriltags import Detector
 import cv2
 import numpy as np
 import time
+import threading
+import math
 
 
-# Defined below is a dictionary with the 8 apriltags around the arena, 1 through 8 rotating anticlockwise (accounts for position and orientation)
+# Defined below is a class with different variables to calculate for the threading code
+# Tag_data os a dictionary with the 8 apriltags around the arena, 1 through 8 rotating anticlockwise (accounts for position and orientation)
 class Coordinates:
     def __init__(self):
-        self.position = None
-        self.rotation = None
+        self.position = np.array(([0, 0, 0, 0]))
+        self.theta = 0
+        self.phi = 0
+        self.checkpoint = np.array(([1, 7]))
         self.tag_data = {1: np.array(([[-1, 0, 0, 2, ],
                                        [0, 0, -1, 0],
                                        [0, -1, 0, 0],
@@ -54,6 +59,7 @@ class Coordinates:
 
     # This function find the position of the camera in terms of the predefined coordinate plane
     def find_position_from_tag(self, K, detection):
+        tag_size = 0.16 / 0.3048
         m_half_size = tag_size / 2
 
         marker_center = np.array((0, 0, 0))
@@ -100,12 +106,10 @@ class Coordinates:
                 results = self.at_detector.detect(gray, estimate_tag_pose=False)
 
                 # Values to store the position and rotation of nearest apriltag
-                t_hat = None
-                r_hat = None
                 mintca = None
 
                 for res in results:
-                    pose = find_position_from_tag(K, res)
+                    pose = self.find_position_from_tag(K, res)
                     rot, jaco = cv2.Rodrigues(pose[1], pose[1])
 
                     pts = res.corners.reshape((-1, 1, 2)).astype(np.int32)
@@ -131,16 +135,32 @@ class Coordinates:
 
                     # Get camera rotation
                     Rotation = (Transform_World_Camera[:3, :3])
-
+                    
+                    #Transform 3x3 Rotation matrix into theta
+                    Theta = math.atan2(Rotation[0, 2], Rotation[1,2])
+                    
+                    #Caluclate Phi
+                    Vw = np.array(([0, 0]))
+                    Vw[0] = self.checkpoint[0] - Position[0] 
+                    Vw[1] = self.checkpoint[1] - Position[1]
+                    Vw = Vw/np.linalg.norm(Vw)
+                    Vr = np.array(([0, 0]))
+                    Vr = np.array(([math.cos(Theta), math.sin(Theta)]))
+                    Vr = Vr/np.linalg.norm(Vr)
+                    w = np.matmul(Vw, Vr)
+                    Phi = math.acos(w)
+                   
                     # If two or more apriltags are detected, use the closest one
                     if (mintca is None or np.linalg.norm(pose[0]) < mintca):
                         self.position = Position
-                        self.rotation = Rotation
+                        self.theta = Theta
+                        self.phi = Phi
                         mintca = np.linalg.norm(pose[0])
 
                 # To print the position and rotation of closest apriltag
-                # print(t_hat, "\n")
-                # print(r_hat, "\n")
+                #print(self.position, "\n")
+                #print(self.theta, "\n")
+               
 
                 cv2.imshow("undistorted", undistorted_img)
                 cv2.waitKey(1)
@@ -154,8 +174,13 @@ class Coordinates:
 
 if __name__ == '__main__':
     u = Coordinates()
-    u.calculaterobotposition()
-    print(u.position)
-    print(u.rotation)
+    positionthread = threading.Thread(target = u.calculaterobotposition)
+    positionthread.start()
+    
+    while(True):
+    	#print(u.position, "\n")
+    	#print(u.theta, "\n")
+    	print(u.phi, "\n")
 
 # guvcview
+
