@@ -4,7 +4,6 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import filter
-import sounddevice as sd
 from scipy.fft import fft, ifft, fftfreq
 from scipy import signal
 
@@ -26,6 +25,7 @@ class Streaming(object):
         self.tv = []
         self.stream_open = False
         self.audio_data = []
+        self.distance = 0
 
     def start_recording(self):
         self.stream_open = True
@@ -200,7 +200,7 @@ class Streaming(object):
         while self.stream_open:
             self.create_space()
 
-            filteredAmp = mic1.filter(4000, plot=False, normalize=False)
+            filteredAmp = self.filter(4000, plot=False, normalize=False)
             fmax_ind = np.argmax(filteredAmp)
             fmax = abs(filteredAmp[fmax_ind])
 
@@ -210,9 +210,9 @@ class Streaming(object):
             sorted_fAmp = filteredAmp[descend]
             top_n_mag = sorted_fAmp[0:n]
             fmax_avg = abs(np.mean(top_n_mag))
+            self.distance = fmax_avg
+            print('Average Filtered Magnitude: ', self.distance)
 
-            # print('Filtered Magnitude: ', fmax)
-            print('Average Filtered Magnitude: ', fmax_avg)
 
 
 if __name__ == "__main__":
@@ -233,3 +233,5 @@ if __name__ == "__main__":
     # print('Time Delay: ', tdoa)
     # print('Distance (m):', tdoa * 343)
     mic1.magnitude()
+
+    # can make a new analysis file and paste in the functions replacing the arguments w Streaming mic1 etc
