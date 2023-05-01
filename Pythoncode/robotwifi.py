@@ -44,7 +44,6 @@ while(True):
    phi = x.phi
    
    #Send data to mouse
-   #Change this to just send Phi
    offset_pack = struct.pack("f", phi)
    UDPServerSocket.sendto(offset_pack, address)
    
