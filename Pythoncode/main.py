@@ -41,7 +41,9 @@ mic1.start_recording()
 thread1 = threading.Thread(target=mic1.stream_read)
 thread1.start()
 time.sleep(1)
-mic1.magnitude()
+
+Mic_thread = threading.Thread(target=mic1.magnitude())
+Mic_thread.start()
 
 # Initialize Camera
 x = calculaterobotposition.Coordinates()

@@ -223,15 +223,11 @@ if __name__ == "__main__":
     # mic2.device_index = 2
     # mic2.start_recording()
     thread1 = threading.Thread(target=mic1.stream_read)
-    # thread2 = threading.Thread(target=mic2.stream_read)
+
     thread1.start()
-    # thread2.start()
-    time.sleep(2)
-    # D = mic1.time_delay(mic2, 4000)
-    # delay = mic1.cross_correlation(mic2, 4000)
-    # tdoa = abs(delay)
-    # print('Time Delay: ', tdoa)
-    # print('Distance (m):', tdoa * 343)
-    mic1.magnitude()
+    time.sleep(1)
+
+    Mic_thread = threading.Thread(target=mic1.magnitude())
+    Mic_thread.start()
 
     # can make a new analysis file and paste in the functions replacing the arguments w Streaming mic1 etc
