@@ -55,8 +55,12 @@ while (True):
     phi = x.phi
     distance = mic1.distance
 
+    if distance > 175:
+        forward = True
+    else:
+        forward = False
     # Send data to mouse
-    offset_pack = struct.pack("f", phi, distance)
+    offset_pack = struct.pack("f", phi, forward)
     UDPServerSocket.sendto(offset_pack, address)
 
     time.sleep(0.2)
