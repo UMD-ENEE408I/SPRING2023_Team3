@@ -60,7 +60,7 @@ while (True):
     else:
         forward = False
     # Send data to mouse
-    offset_pack = struct.pack("f", phi, forward)
+    offset_pack = struct.pack("ff", phi, forward)
     UDPServerSocket.sendto(offset_pack, address)
 
     time.sleep(0.2)
