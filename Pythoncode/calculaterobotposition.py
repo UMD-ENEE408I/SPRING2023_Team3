@@ -81,7 +81,7 @@ class Coordinates:
         return p.reshape((3,)), r.reshape((3,))
 
     def calculaterobotposition(self):
-        vid = cv2.VideoCapture(0)
+        vid = cv2.VideoCapture(1)
 
         tag_size = 0.16 / 0.3048  # tag size in meters, divided by ratio to have calculations in square titles (feet)
 
