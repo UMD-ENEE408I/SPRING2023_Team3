@@ -205,14 +205,13 @@ class Streaming(object):
             fmax = abs(filteredAmp[fmax_ind])
 
             # Average out the top n indices to get a more stable magnitude
-            n = 50
+            n = 20
             descend = filteredAmp.argsort()[::-1]
             sorted_fAmp = filteredAmp[descend]
             top_n_mag = sorted_fAmp[0:n]
             fmax_avg = abs(np.mean(top_n_mag))
             self.distance = fmax_avg
-            print('Average Filtered Magnitude: ', self.distance)
-
+            # print('Average Filtered Magnitude: ', self.distance)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 import MicStreaming
 import calculaterobotposition
-import robotwifi
 import time
 import threading
 import socket
@@ -36,33 +35,44 @@ print(clientIP)
 
 # Initialize Microphone
 mic1 = MicStreaming.Streaming()
-mic1.device_index = 1
+# Set Device index
+info = mic1.audio.get_host_api_info_by_index(0)
+numdevices = info.get('deviceCount')
+for i in range(0, numdevices):
+    if mic1.audio.get_device_info_by_host_api_device_index(0,i).get('maxInputChannels') > 0:
+        if mic1.audio.get_device_info_by_host_api_device_index(0, i).get('name') == 'Microphone (2- USBAudio1.0)':
+            mic1.device_index = i
+        print('Input Device id ', i, ' - ', mic1.audio.get_device_info_by_host_api_device_index(0, i).get('name'))
+print(mic1.device_index)
 mic1.start_recording()
 thread1 = threading.Thread(target=mic1.stream_read)
 thread1.start()
 time.sleep(1)
+print('Mic Recording...')
 
-Mic_thread = threading.Thread(target=mic1.magnitude())
+Mic_thread = threading.Thread(target=mic1.magnitude)
 Mic_thread.start()
+print('Calculating Magnitude...')
 
-# Initialize Camera
 x = calculaterobotposition.Coordinates()
 positionthread = threading.Thread(target=x.calculaterobotposition)
 positionthread.start()
+print('Camera Started')
+
 
 while (True):
     # Get phi variable from calculaterobotposition.py
     phi = x.phi
     distance = mic1.distance
 
-    if distance > 175:
-        forward = True
-    else:
+    if distance > 300:
         forward = False
+    else:
+        forward = True
     # Send data to mouse
-    offset_pack = struct.pack("f", phi, forward)
+    print('Move Forward: ', forward, '          ', distance)
+    offset_pack = struct.pack("ff", phi, forward)
     UDPServerSocket.sendto(offset_pack, address)
-
     time.sleep(0.2)
 
 
