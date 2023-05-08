@@ -238,6 +238,8 @@ void loop() {
   // time starts from 0
   float start_t = (float)micros() / 1000000.0;
   float last_t = -target_period_ms / 1000.0; // Offset by expected looptime to avoid divide by zero
+  
+  
   while (true) {
 
     ledcWriteTone(BUZZ_CHANNEL, 4000);
