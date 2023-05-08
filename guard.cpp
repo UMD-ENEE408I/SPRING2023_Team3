@@ -9,6 +9,7 @@ Adafruit_MPU6050 mpu;
 // Buzzer pin which we will use for indicating IMU initialization failure
 const unsigned int BUZZ = 26;
 const unsigned int BUZZ_CHANNEL = 0;
+const unsigned int octave = 8;
 
 // Need these pins to turn off light bar ADC chips
 const unsigned int ADC_1_CS = 2;
@@ -168,13 +169,17 @@ void setup() {
   pinMode(ADC_2_CS, OUTPUT);
   digitalWrite(ADC_1_CS, HIGH);
   digitalWrite(ADC_2_CS, HIGH);
+  pinMode(14, OUTPUT);
+  digitalWrite(14, LOW);
 
   ledcAttachPin(BUZZ, BUZZ_CHANNEL);
+  
 
   pinMode(VCC_SENSE, INPUT);
 
   configure_motor_pins();
   configure_imu();
+
 
   Serial.println("Starting!");
 }
