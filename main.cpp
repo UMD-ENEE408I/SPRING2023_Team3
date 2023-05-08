@@ -67,8 +67,6 @@ Adafruit_MCP3008 adc2;
 const unsigned int BUZZ = 26;
 const unsigned int BUZZ_CHANNEL = 0;
 
-boolean startLoop = false;
-
 // Need these pins to turn off light bar ADC chips
 const unsigned int ADC_1_CS = 2;
 const unsigned int ADC_2_CS = 17;
@@ -309,15 +307,15 @@ void loop() {
   float backStart = 0.00;
   boolean moving = false;
   boolean movingBack = false;
-  boolean sound = false;
+  float sound = false;
   float robot_phi = 0.00;
   int adc1_buf[8];
   int adc2_buf[8];
   float theta_time = 0; // 1.95 for full 180
   float target_v = 0;
   float target_omega = 0;
-  int checkpoint_case = 0; // 1 for , 2 for , 3 for 
-  int theta_case = 0; // 1 for  , 2 for 3 for 
+  int checkpoint_case = 2; // 1 , 2 , 3  
+  int theta_case = 0;  
 
   // The real "loop()"
   // time starts from 0
@@ -329,6 +327,7 @@ void loop() {
     float dt = ((float)(t - last_t)); // Calculate time since last update
     
     // Wifi Loop
+    /*
     if(connected) {
       //Send a packet
       udp.beginPacket(udpAddress,udpPort);
@@ -344,85 +343,88 @@ void loop() {
         udp.flush();
         Serial.printf("phi: %f\n", phi);
         Serial.printf("sound %f\n", sound);
-      } else {
+      } else { 
         Serial.printf("Nothing to print");
       }
-      delay(100);
-
+    }
+      */
+      
+      phi = 2.95;
       // can start the movement once we have valid phi and not moving
       if (phi != 0.00 && moving == false) {
         moveStart = t;
         moving = true;
         robot_phi = phi;
       }
-    }
+    
     
     Serial.println(robot_phi);
     Serial.println(sound);
 
     // determining the rotation time for the first move with 
-/*    if(robot_phi >= value && robot_phi <= 2) { // starting point 1
+    if(robot_phi >= 2.9 && robot_phi <= 3) { // starting point 1
       theta_case = 1;
-    } else if (robot_phi >= 0.8 && robot_phi <= 1) { // starting point 2
+      Serial.println("setting theta case");
+    } else if (robot_phi >= 0.1 && robot_phi <= 0.18) { // starting point 2
       theta_case = 2; 
-    } else if (robot_phi >=2.5 && robot_phi <= 2.8) { // starting point 3
+    } else if (robot_phi > 0 && robot_phi <= 0.03) { // starting point 3
       theta_case = 3;
     } else {
       theta_case = 0;
     }
-*/
-/*
+
+
     switch (checkpoint_case) {
     case 1:
         switch (theta_case) {
             case 1:
-                theta_case = ;
+                theta_time = 1.96;
                 break;
             case 2:
-                theta_case = ;
-                break;
-            case 3:
-                theta_case = ;
-                break;
-            case 0:
                 theta_time = 0;
                 break;
-        }
-        break;
-    case 2:
-        switch (theta_case) {
-            case 1:
-                theta_case = ;
-                break;
-            case 2:
-                theta_case = ;
-                break;
             case 3:
-                theta_case = ;
-                break;
-            case 0:
                 theta_time = 0;
-                break;    
-        }
-        break;
-    case 3:
-        switch (theta_case) {
-            case 1:
-                theta_case = ;
-                break;
-            case 2:
-                theta_case = ;
-                break;
-            case 3:
-                theta_case = ;
                 break;
             case 0:
                 theta_time = 0;
                 break; 
         }
         break;
-}
-*/
+    case 2:
+        switch (theta_case) {
+            case 1:
+                theta_time = 1.65;
+                break;
+            case 2:
+                theta_time = 1.96;
+                break;
+            case 3:
+                theta_time = 1.55;
+                break;
+            case 0:
+                theta_time = 0;
+                break;     
+        }
+        break;
+    case 3:
+        switch (theta_case) {
+            case 1:
+                theta_time = 0;
+                break;
+            case 2:
+                theta_time = 0;
+                break;
+            case 3:
+                theta_time = 1.96;
+                break;
+            case 0:
+                theta_time = 0;
+                break; 
+        }
+        break;
+    }
+
     last_t = t;
     // Get the distances the wheels have traveled in meters
     // positive is forward
@@ -471,12 +473,6 @@ void loop() {
     for(int i = 0; i < 6; i++){
       adcT_buf[i*2+1] = adc2_buf[i];
     }
-/*
-    for(int i = 0; i < 13; i++) {
-      Serial.print(adcT_buf[i]); Serial.print("\t");
-    }
-    Serial.println();
-*/ 
 
     // movement starts if the boolean for the correct phi reading is triggered, and the initial movement lasts for
     // the duration of the calculated time for the angle needed
