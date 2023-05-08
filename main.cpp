@@ -13,13 +13,11 @@ const char * networkPswd = "goterps2022";
 //IP address to send UDP data to:
 // either use the ip address of the server or 
 // a network broadcast address
-const char * udpAddress = "192.168.2.142";
+const char * udpAddress = "192.168.2.126";
 const int udpPort = 3333;
 
 //Are we currently connected?
 boolean connected = false;
-
-float phi = 0.00; 
 
 //The udp library class
 WiFiUDP udp;
@@ -251,6 +249,7 @@ void setup() {
 
 void loop() {
 
+
   // Create the encoder objects after the motor has
   // stopped, else some sort exception is triggered
   Encoder enc1(M1_ENC_A, M1_ENC_B);
@@ -304,54 +303,127 @@ void loop() {
   float ktheta = (2 * 3.14159) / (90.0 * 3.14159 / 180.0);
   est_imu_bias(bias_omega, 500);// Could be expanded for more quantities
 
+  // Variables used for rotation, sound, and movement speed
+  float phi = 0.00; 
+  float moveStart = 0.00;
+  float backStart = 0.00;
+  boolean moving = false;
+  boolean movingBack = false;
+  boolean sound = false;
+  float robot_phi = 0.00;
+  int adc1_buf[8];
+  int adc2_buf[8];
+  float theta_time = 0; // 1.95 for full 180
+  float target_v = 0;
+  float target_omega = 0;
+  int checkpoint_case = 0; // 1 for , 2 for , 3 for 
+  int theta_case = 0; // 1 for  , 2 for 3 for 
+
   // The real "loop()"
   // time starts from 0
   float start_t = (float)micros() / 1000000.0;
   float last_t = -target_period_ms / 1000.0; // Offset by expected looptime to avoid divide by zero
-
   while (true) {
-    while(startLoop == false) {
-      Serial.println("in wifi loop");
-      if(connected) {
-        //Send a packet
-        udp.beginPacket(udpAddress,udpPort);
-        udp.printf("Seconds since boot: %lu", millis()/1000);
-        udp.endPacket();
-
-        int packetSize = udp.parsePacket();
-
-        if(packetSize >= sizeof(float)) {
-          // Serial.printf("packet size is %d\n", packetSize);
-          udp.read((char*)&phi, sizeof(phi)); 
-          udp.flush();
-          Serial.printf("phi: %f\n", phi);
-        } else {
-          Serial.printf("Nothing to print");
-        }
-      }
-      delay(100);
-
-      Serial.println(phi);
-
-      // can start the movement loop once we have valid coordinates 
-      if(phi != 0.00) {
-        startLoop = true;
-      }
-    }
-     
-
-  
     // Get the time elapsed
     float t = ((float)micros()) / 1000000.0 - start_t;
     float dt = ((float)(t - last_t)); // Calculate time since last update
-    // Serial.print("t "); Serial.print(t);
-    // Serial.print(" dt "); Serial.print(dt * 1000.0);
-    last_t = t;
-
-    // Robot Coordinates
-    float robot_phi = phi;
-    Serial.printf("phi: %f\n", robot_phi);
     
+    // Wifi Loop
+    if(connected) {
+      //Send a packet
+      udp.beginPacket(udpAddress,udpPort);
+      udp.printf("Seconds since boot: %lu", millis()/1000);
+      udp.endPacket();
+
+      int packetSize = udp.parsePacket();
+
+      if(packetSize >= 2*sizeof(float)) {
+        // Serial.printf("packet size is %d\n", packetSize);
+        udp.read((char*)&phi, sizeof(phi));
+        udp.read((char*)&sound, sizeof(sound)); 
+        udp.flush();
+        Serial.printf("phi: %f\n", phi);
+        Serial.printf("sound %f\n", sound);
+      } else {
+        Serial.printf("Nothing to print");
+      }
+      delay(100);
+
+      // can start the movement once we have valid phi and not moving
+      if (phi != 0.00 && moving == false) {
+        moveStart = t;
+        moving = true;
+        robot_phi = phi;
+      }
+    }
+    
+    Serial.println(robot_phi);
+    Serial.println(sound);
+
+    // determining the rotation time for the first move with 
+/*    if(robot_phi >= value && robot_phi <= 2) { // starting point 1
+      theta_case = 1;
+    } else if (robot_phi >= 0.8 && robot_phi <= 1) { // starting point 2
+      theta_case = 2; 
+    } else if (robot_phi >=2.5 && robot_phi <= 2.8) { // starting point 3
+      theta_case = 3;
+    } else {
+      theta_case = 0;
+    }
+*/
+/*
+    switch (checkpoint_case) {
+    case 1:
+        switch (theta_case) {
+            case 1:
+                theta_case = ;
+                break;
+            case 2:
+                theta_case = ;
+                break;
+            case 3:
+                theta_case = ;
+                break;
+            case 0:
+                theta_time = 0;
+                break;
+        }
+        break;
+    case 2:
+        switch (theta_case) {
+            case 1:
+                theta_case = ;
+                break;
+            case 2:
+                theta_case = ;
+                break;
+            case 3:
+                theta_case = ;
+                break;
+            case 0:
+                theta_time = 0;
+                break;    
+        }
+        break;
+    case 3:
+        switch (theta_case) {
+            case 1:
+                theta_case = ;
+                break;
+            case 2:
+                theta_case = ;
+                break;
+            case 3:
+                theta_case = ;
+                break;
+            case 0:
+                theta_time = 0;
+                break; 
+        }
+        break;
+}
+*/
+    last_t = t;
     // Get the distances the wheels have traveled in meters
     // positive is forward
     float pos_left  =  (float)enc1.read() * METERS_PER_TICK;
@@ -368,30 +440,15 @@ void loop() {
     read_imu(omega); // Could be expanded to read more things
     omega -= bias_omega; // Remove the constant bias measured in the beginning
     theta = theta + omega * dt;
-    // Serial.print(" omega "); Serial.print(omega);
-    // Serial.print(" theta "); Serial.print(theta);
-
-    // Serial.print(" last_x "); Serial.print(last_x);
-    // Serial.print(" last_y "); Serial.print(last_y);
-    // Serial.print(" last_dx "); Serial.print(last_dx);
-    // Serial.print(" last_dy "); Serial.print(last_dy);
-    // Serial.print(" last tv "); Serial.print(last_target_v);
 
     // Calculate target forward velocity and target heading to track the leminscate trajectory
     // of 0.5 meter radius
     float x, y;
     leminscate_of_bernoulli(leminscate_t_scale * t, leminscate_a, x, y);
 
-    // Serial.print(" x "); Serial.print(x);
-    // Serial.print(" y "); Serial.print(y);
-
     float dx = (x - last_x) / dt;
     float dy = (y - last_y) / dt;
     //float target_v = sqrtf(dx * dx + dy * dy); // forward velocity
-
-    // Serial.print(" dx "); Serial.print(dx);
-    // Serial.print(" dy "); Serial.print(dy);
-    // Serial.print(" tv "); Serial.print(target_v);
 
     // Compute the change in heading using the normalized dot product between the current and last velocity vector
     // using this method instead of atan2 allows easy smooth handling of angles outsides of -pi / pi at the cost of
@@ -399,19 +456,13 @@ void loop() {
     // float target_omega = signed_angle(last_dx, last_dy, last_target_v, dx, dy, target_v) / dt;
 
     // Checkpoint and Robot Coordinates
-    int adc1_buf[8];
-    int adc2_buf[8];
-    int checkpoint_x = 0;
-    int checkpoint_y = 0;
-    int soundMag = 0;
-    float theta_time = 0;
-    float target_v = 0;
-    float target_omega = 0;
+    
 
     for (int i = 0; i < 8; i++) {
       adc1_buf[i] = adc1.readADC(i);
       adc2_buf[i] = adc2.readADC(i);
     }
+
     //Setup for total adc_buf
     int adcT_buf[13];
     for(int i = 0; i < 7; i++){
@@ -421,30 +472,39 @@ void loop() {
       adcT_buf[i*2+1] = adc2_buf[i];
     }
 /*
-    if (t < theta_time) {
+    for(int i = 0; i < 13; i++) {
+      Serial.print(adcT_buf[i]); Serial.print("\t");
+    }
+    Serial.println();
+*/ 
+
+    // movement starts if the boolean for the correct phi reading is triggered, and the initial movement lasts for
+    // the duration of the calculated time for the angle needed
+    if (((t-moveStart) < theta_time) && (moving == true)) {
       target_omega = 90.0 * (3.1459 / 180.0);
-    } else {
+    } else if (moving == false) { // if moving bool is false, we don't move ever
+      target_omega = 0;
+      target_v = 0;
+    } else { // if the other conditions are not met, we just move straight (the turn has been completed)
       target_omega = 0;
       target_v = 0.3;
-      if(soundMag > 10000) {
-        target_v = 0;
-        delay(1000);
-        target_v = -0.3;  
-        delay(1000);
+      if (sound ==  true) { // if at any time during our movement straight we hear a loud sound, we back up until its gone
+        target_v = -0.1;
       }
-      if((adcT_buf[6] > 600) && (adcT_buf[7] > 600) && (adcT_buf[8] > 600)) {
+      if((adcT_buf[6] >= 680) && (adcT_buf[7] >= 680) && (adcT_buf[8] >= 680) && movingBack == false) { // if the middle 3 adc sensors sense a color (start to turn)
+        backStart = t;
         target_v = 0;
-        target_omega = 90.0 * (3.1459 / 180.0);
-        delay(2000);
+        movingBack = true; // into the last phase of the movement 
       }
     }
-    */
-    target_omega = 0;
-    target_v = 0;
-    target_theta = target_theta + target_omega * dt;
+    // this is the movement back part
+    if (((t-backStart) < 1.97) && (movingBack == true)) { // turn for 2 seconds (180 degress back)
+        target_v = 0;
+        target_omega = 90.0 * (3.1459 / 180.0);
+    }
 
-    // Serial.print(" target_omega "); Serial.print(target_omega);
-    // Serial.print(" t theta "); Serial.print(target_theta);
+    //target_omega = 90.0 * (3.1459 / 180.0);
+    target_theta = target_theta + target_omega * dt;
 
     last_x = x;
     last_y = y;
@@ -463,11 +523,6 @@ void loop() {
     target_pos_left  = target_pos_left  + dt * target_v_left;
     target_pos_right = target_pos_right + dt * target_v_right;
 
-    // Serial.print(" tpl "); Serial.print(target_pos_left);
-    // Serial.print(" pl "); Serial.print(pos_left);
-    // Serial.print(" tpr "); Serial.print(target_pos_right);
-    // Serial.print(" pr "); Serial.print(pos_right);
-
     // Left motor position PID
     float left_voltage = update_pid(dt, kp_left, ki_left, kd_left,
                                     target_pos_left, pos_left,
@@ -484,12 +539,8 @@ void loop() {
     left_voltage = right_voltage + kf_right * target_v_right;
     float right_pwm = (float)MAX_PWM_VALUE * (right_voltage / 8.0); // TODO use actual battery voltage
 
-    // Serial.print(" l voltage " ); Serial.print(left_voltage);
-    // Serial.print(" r voltage " ); Serial.print(right_voltage);
-
     set_motors_pwm(left_pwm, right_pwm);
 
-    // Serial.println();
     delay(target_period_ms);
   }
 }
