@@ -59,17 +59,15 @@ positionthread = threading.Thread(target=x.calculaterobotposition)
 positionthread.start()
 print('Camera Started')
 
+coord = 1
 while (True):
     # Get phi variable from calculaterobotposition.py
     phi = x.phi
     distance = mic1.distance
-    print(phi)
-    if distance > 300:
-        forward = False
-    else:
-        forward = True
-    # Send data to mouse\
-    offset_pack = struct.pack("ff", phi, distance)
+    print(phi, '             ', distance, '              ', coord)
+
+    # Send data to mouse
+    offset_pack = struct.pack("ffi", phi, distance, coord)
     UDPServerSocket.sendto(offset_pack, address)
 
 

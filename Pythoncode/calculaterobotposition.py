@@ -13,7 +13,7 @@ class Coordinates:
         self.position = np.array(([0, 0, 0, 0]))
         self.theta = 0
         self.phi = 0
-        self.checkpoint = np.array(([1, 1]))
+        self.checkpoint = np.array(([3, 3]))
         self.tag_data = {1: np.array(([[-1, 0, 0, 2, ],
                                        [0, 0, -1, 0],
                                        [0, -1, 0, 0],

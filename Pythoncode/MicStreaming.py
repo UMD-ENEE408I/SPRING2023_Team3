@@ -216,7 +216,15 @@ class Streaming(object):
 
 if __name__ == "__main__":
     mic1 = Streaming()
-    mic1.device_index = 1
+    info = mic1.audio.get_host_api_info_by_index(0)
+    numdevices = info.get('deviceCount')
+    for i in range(0, numdevices):
+        if mic1.audio.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels') > 0:
+            if mic1.audio.get_device_info_by_host_api_device_index(0, i).get('name') == 'Microphone (2- USBAudio1.0)':
+                mic1.device_index = i
+            print('Input Device id ', i, ' - ', mic1.audio.get_device_info_by_host_api_device_index(0, i).get('name'))
+    print(mic1.device_index)
+    mic1.start_recording()
     mic1.start_recording()
     # mic2 = Streaming()
     # mic2.device_index = 2
