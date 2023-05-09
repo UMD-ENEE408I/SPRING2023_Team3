@@ -169,8 +169,6 @@ void setup() {
   pinMode(ADC_2_CS, OUTPUT);
   digitalWrite(ADC_1_CS, HIGH);
   digitalWrite(ADC_2_CS, HIGH);
-  pinMode(14, OUTPUT);
-  digitalWrite(14, LOW);
 
   ledcAttachPin(BUZZ, BUZZ_CHANNEL);
   
@@ -240,13 +238,30 @@ void loop() {
   // time starts from 0
   float start_t = (float)micros() / 1000000.0;
   float last_t = -target_period_ms / 1000.0; // Offset by expected looptime to avoid divide by zero
+  
+  
   while (true) {
+
+    ledcWriteTone(BUZZ_CHANNEL, 4000);
     // Get the time elapsed
     float t = ((float)micros()) / 1000000.0 - start_t;
     float dt = ((float)(t - last_t)); // Calculate time since last update
     // Serial.print("t "); Serial.print(t);
     Serial.print(" dt "); Serial.print(dt * 1000.0);
     last_t = t;
+    
+    // int t2 = int(t/1000);
+    // if (t2 % 100 > 50){
+    //   ledcWriteTone(BUZZ_CHANNEL, 4000);
+    // }
+    // else if(t2 % 100 > 0 && t2 % 100 < 50){
+    //   ledcWriteNote(BUZZ_CHANNEL, NOTE_A, octave);
+    // }
+
+    // ledcWriteNote(BUZZ_CHANNEL, NOTE_C, octave);
+    // delay(50);
+    // ledcWriteNote(BUZZ_CHANNEL, NOTE_A, octave);
+    // delay(50);
 
     // Get the distances the wheels have traveled in meters
     // positive is forward
@@ -293,8 +308,10 @@ void loop() {
     // using this method instead of atan2 allows easy smooth handling of angles outsides of -pi / pi at the cost of
     // a slow drift defined by numerical precision
     // float target_omega = signed_angle(last_dx, last_dy, last_target_v, dx, dy, target_v) / dt;
-    float target_v = 0.5;
-    float target_omega = 90.0 * (3.1459 / 180.0);
+    int r = .5;
+    int T = 10;
+    float target_v = 2*3.1415*r/T;
+    float target_omega = 2* (3.1459 / 10);
 	
     target_theta = target_theta + target_omega * dt;
 
