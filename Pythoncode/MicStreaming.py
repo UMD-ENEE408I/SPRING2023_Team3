@@ -236,5 +236,3 @@ if __name__ == "__main__":
 
     Mic_thread = threading.Thread(target=mic1.magnitude())
     Mic_thread.start()
-
-    # can make a new analysis file and paste in the functions replacing the arguments w Streaming mic1 etc
