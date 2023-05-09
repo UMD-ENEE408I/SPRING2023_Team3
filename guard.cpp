@@ -238,8 +238,6 @@ void loop() {
   // time starts from 0
   float start_t = (float)micros() / 1000000.0;
   float last_t = -target_period_ms / 1000.0; // Offset by expected looptime to avoid divide by zero
-  
-  
   while (true) {
 
     ledcWriteTone(BUZZ_CHANNEL, 4000);
@@ -308,10 +306,10 @@ void loop() {
     // using this method instead of atan2 allows easy smooth handling of angles outsides of -pi / pi at the cost of
     // a slow drift defined by numerical precision
     // float target_omega = signed_angle(last_dx, last_dy, last_target_v, dx, dy, target_v) / dt;
-    int r = .5;
-    int T = 10;
-    float target_v = 2*3.1415*r/T;
-    float target_omega = 2* (3.1459 / 10);
+    float r = .5;
+    float target_v = .2;
+    float T = 2*3.1415*r/ target_v;
+    float target_omega = 2*3.1415/T;
 	
     target_theta = target_theta + target_omega * dt;
 
