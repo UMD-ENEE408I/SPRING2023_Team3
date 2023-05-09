@@ -243,6 +243,9 @@ void setup() {
  
 
   Serial.println("Starting!");
+  while (connected == false) {
+    delay(100);
+  }
 }
 
 void loop() {
@@ -301,22 +304,31 @@ void loop() {
   float ktheta = (2 * 3.14159) / (90.0 * 3.14159 / 180.0);
   est_imu_bias(bias_omega, 500);// Could be expanded for more quantities
 
-  // Variables used for rotation, sound, and movement speed
+  // Global variables used for rotation, sound, and movement speed, etc
+  // These are changed from wifi
   float phi = 0.00; 
-  float moveStart = 0.00;
+  float sound = 0.00;
+  float robot_phi = 0.00;
+
+  // Control the logic and timing
+  float moveStart = 0.00; 
   float backStart = 0.00;
   boolean moving = false;
   boolean movingBack = false;
-  float sound = false;
-  float robot_phi = 0.00;
+  
+  // arrays for adc sensors 
   int adc1_buf[8];
   int adc2_buf[8];
+
+  // movement variables
   float theta_time = 0; // 1.95 for full 180
   float target_v = 0;
   float target_omega = 0;
-  int checkpoint_case = 2; // 1 , 2 , 3  
-  int theta_case = 0;  
 
+  // determines the movement we will make
+  int checkpoint_case = 0;  
+  int theta_case = 0;   
+  int count = 0;
   // The real "loop()"
   // time starts from 0
   float start_t = (float)micros() / 1000000.0;
@@ -327,7 +339,7 @@ void loop() {
     float dt = ((float)(t - last_t)); // Calculate time since last update
     
     // Wifi Loop
-    /*
+    
     if(connected) {
       //Send a packet
       udp.beginPacket(udpAddress,udpPort);
@@ -337,43 +349,42 @@ void loop() {
       int packetSize = udp.parsePacket();
 
       if(packetSize >= 2*sizeof(float)) {
-        // Serial.printf("packet size is %d\n", packetSize);
         udp.read((char*)&phi, sizeof(phi));
-        udp.read((char*)&sound, sizeof(sound)); 
+        udp.read((char*)&sound, sizeof(sound));
+        udp.read((char*)&checkpoint_case, sizeof(checkpoint_case));
+       // udp.read((char*)&checkpoint_case, sizeof(checkpoint_case)); 
         udp.flush();
-        Serial.printf("phi: %f\n", phi);
-        Serial.printf("sound %f\n", sound);
+        //Serial.printf("phi: %f\n", phi);
+        //Serial.printf("sound: %f\n", sound);
+      // Serial.printf("checkpoint: %f\n", checkpoint_case);
       } else { 
-        Serial.printf("Nothing to print");
+        Serial.println("Nothing to print");
       }
     }
-      */
       
-      phi = 2.95;
       // can start the movement once we have valid phi and not moving
       if (phi != 0.00 && moving == false) {
-        moveStart = t;
-        moving = true;
-        robot_phi = phi;
+        robot_phi += phi;
+        count++;
+        if(count == 20) { // averaged the first 20 phi values to eliminate an error with the first phi read
+          moveStart = t;
+          moving = true; // once we have 20 phi values, we can start moving
+          robot_phi = robot_phi / 20;
+        }
       }
-    
-    
-    Serial.println(robot_phi);
-    Serial.println(sound);
 
-    // determining the rotation time for the first move with 
-    if(robot_phi >= 2.9 && robot_phi <= 3) { // starting point 1
+    // determining the starting point of the robot 
+    if(robot_phi >= 2.5 && robot_phi <= 3.5) { // starting point 1
       theta_case = 1;
-      Serial.println("setting theta case");
-    } else if (robot_phi >= 0.1 && robot_phi <= 0.18) { // starting point 2
+    } else if (robot_phi >= 1.5 && robot_phi <= 2.2) { // starting point 2
       theta_case = 2; 
-    } else if (robot_phi > 0 && robot_phi <= 0.03) { // starting point 3
+    } else if (robot_phi > 0.4 && robot_phi <= 1) { // starting point 3
       theta_case = 3;
     } else {
       theta_case = 0;
     }
 
-
+    // 9 possible combinations of starting and end points
     switch (checkpoint_case) {
     case 1:
         switch (theta_case) {
@@ -381,12 +392,12 @@ void loop() {
                 theta_time = 1.96;
                 break;
             case 2:
-                theta_time = 0;
+                theta_time = 2.27;
                 break;
             case 3:
-                theta_time = 0;
+                theta_time = 2.5;
                 break;
-            case 0:
+            case 0: // if we don't yet have a phi reading
                 theta_time = 0;
                 break; 
         }
@@ -394,13 +405,13 @@ void loop() {
     case 2:
         switch (theta_case) {
             case 1:
-                theta_time = 1.65;
+                theta_time = 1.73;
                 break;
             case 2:
                 theta_time = 1.96;
                 break;
             case 3:
-                theta_time = 1.55;
+                theta_time = 2.27;
                 break;
             case 0:
                 theta_time = 0;
@@ -410,10 +421,10 @@ void loop() {
     case 3:
         switch (theta_case) {
             case 1:
-                theta_time = 0;
+                theta_time = 1.5;
                 break;
             case 2:
-                theta_time = 0;
+                theta_time = 1.69;
                 break;
             case 3:
                 theta_time = 1.96;
@@ -459,13 +470,13 @@ void loop() {
 
     // Checkpoint and Robot Coordinates
     
-
+    // assigning adc values to an array
     for (int i = 0; i < 8; i++) {
       adc1_buf[i] = adc1.readADC(i);
       adc2_buf[i] = adc2.readADC(i);
     }
 
-    //Setup for total adc_buf
+    // setup for total adc_buf
     int adcT_buf[13];
     for(int i = 0; i < 7; i++){
       adcT_buf[i*2] = adc1_buf[i];
@@ -481,26 +492,27 @@ void loop() {
     } else if (moving == false) { // if moving bool is false, we don't move ever
       target_omega = 0;
       target_v = 0;
-    } else { // if the other conditions are not met, we just move straight (the turn has been completed)
+    } else { // if the other conditions are not met, we just move straight (turns have been completed)
       target_omega = 0;
-      target_v = 0.3;
-      if (sound ==  true) { // if at any time during our movement straight we hear a loud sound, we back up until its gone
+      if (sound > 450) { // if at any time during our movement straight we hear a loud sound, we back up until its gone
         target_v = -0.1;
-      }
-      if((adcT_buf[6] >= 680) && (adcT_buf[7] >= 680) && (adcT_buf[8] >= 680) && movingBack == false) { // if the middle 3 adc sensors sense a color (start to turn)
-        backStart = t;
-        target_v = 0;
+      } else {
+        target_v = 0.3;
+      } 
+      if((adcT_buf[6] >= 680) && (adcT_buf[7] >= 680) && (adcT_buf[8] >= 680) && movingBack == false) { // if the middle 3 adc sensors sense black (start to turn)
+        backStart = t; // set the time for the beginning of a turn
         movingBack = true; // into the last phase of the movement 
       }
     }
     // this is the movement back part
-    if (((t-backStart) < 1.97) && (movingBack == true)) { // turn for 2 seconds (180 degress back)
+    if (((t-backStart) < 1.97) && (movingBack == true)) { // turn for 2 seconds (180 degrees back)
         target_v = 0;
         target_omega = 90.0 * (3.1459 / 180.0);
     }
 
-    //target_omega = 90.0 * (3.1459 / 180.0);
-    target_theta = target_theta + target_omega * dt;
+    target_theta = target_theta + target_omega * dt; // uses the omega to make the heading
+
+    // rest of the code below unchanged
 
     last_x = x;
     last_y = y;
